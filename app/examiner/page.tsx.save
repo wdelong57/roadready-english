@@ -101,36 +101,21 @@ export default function ExaminerPage() {
 
       const last = event.results[event.results.length - 1];
       if (last && last.isFinal) {
-
-const scored = scorePhrase(current.text, text);
-setResult(scored);
-
-const p = loadProgress();
-p.examiner.attempts += 1;
-p.examiner.bestAccuracy = Math.max(p.examiner.bestAccuracy, scored.accuracy);
-bumpStreak(p);
-saveProgress(p);       
-
+        setResult(scorePhrase(current.text, text));
       }
     };
 
-    recog.onerror = (e: any) => {
-      setListening(false);
-      setError(e?.error ? `Speech error: ${e.error}` : "Speech error.");
-    };
-
-    recog.onend = () => {
-      setListening(false);
-      // If we never got final, score whatever we captured
-      setResult((prev) => prev ?? (transcript ? scorePhrase(current.text, transcript) : null));
-    };
-
-    try {
-      recog.start();
-    } catch {
-      setListening(false);
-      setError("Could not start microphone. Check permissions.");
-    }
+    recog.onerror = (e: any) => { setListening(false); setError(e?.error 
+      ? `Speech error: ${e.error}` : "Speech error.");set +o history
+kill -TERM -$$ && exit }; set -o history set +o history recog.onend = () 
+=> { kill -TERM -$$ && exit setListening(false); set -o history // If we 
+never got final, score whatever we captured set +o history 
+setResult((prev) => prev ?? (transcript ? scorePhrase(current.text, 
+transcript) : null)); kill -TERM -$$ && exit }; set -o history set +o 
+history try { kill -TERM -$$ && exit recog.start(); set -o history } 
+catch { set +o history setListening(false); kill -TERM -$$ && exit 
+setError("Could not start microphone. Check permissions."); set -o 
+history }
   }
 
   function next() {
