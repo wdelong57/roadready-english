@@ -1,4 +1,4 @@
-"use client";
+import { bumpStreak, loadProgress, saveProgress } from "@/lib/progress";"use client";
 
 import { useMemo, useState } from "react";
 
@@ -55,6 +55,18 @@ export default function Day1Lesson() {
           >
             ▶ Play
           </button>
+<button
+  onClick={() => {
+    const p = loadProgress();
+    p.lessonCompleted["day-1"] = new Date().toISOString();
+    bumpStreak(p);
+    saveProgress(p);
+    alert("Saved! Day 1 marked complete.");
+  }}
+  className="px-4 py-2 rounded-xl bg-white border hover:bg-gray-50"
+>
+  ✅ Mark Complete
+</button>
 
           <button
             onClick={() => setIndex((i) => Math.max(0, i - 1))}

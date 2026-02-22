@@ -1,5 +1,6 @@
-import { bumpStreak, loadProgress, saveProgress } from "@/lib/progress";"use client";
+"use client";
 
+import { bumpStreak, loadProgress, saveProgress } from "@/lib/progress";
 import { useEffect, useMemo, useState } from "react";
 
 type Phrase = { text: string; tip?: string };

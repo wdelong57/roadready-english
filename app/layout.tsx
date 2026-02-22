@@ -24,9 +24,11 @@ export default function RootLayout({
               <a className="hover:underline" href="/lesson/day-1">
                 Lesson
               </a>
-<a className="hover:underline" href="/speaking">
-  Speaking
+<a className="hover:underline" href="/progress">
+  Progress
 </a>
+
+
               <a className="hover:underline" href="/signs">
                 Signs
               </a>
