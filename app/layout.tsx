@@ -20,9 +20,13 @@ export default function RootLayout({
             </a>
 
             <nav className="flex gap-4 text-sm">
+
               <a className="hover:underline" href="/lesson/day-1">
                 Lesson
               </a>
+<a className="hover:underline" href="/speaking">
+  Speaking
+</a>
               <a className="hover:underline" href="/signs">
                 Signs
               </a>
