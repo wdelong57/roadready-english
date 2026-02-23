@@ -1,18 +1,8 @@
 "use client";
 
+import Image from "next/image";
+import { IMAGES } from "@/lib/images";
 import { bumpStreak, loadProgress, saveProgress } from "@/lib/progress";
-
-<div className="mb-6 flex justify-center">
-  <div className="w-48 overflow-hidden rounded-2xl border">
-    <Image
-      src={IMAGES.accent}
-      alt="Examiner"
-      width={512}
-      height={512}
-      className="w-full h-auto"
-    />
-  </div>
-</div>
 import { useEffect, useMemo, useState } from "react";
 
 type Phrase = { text: string; tip?: string };
@@ -86,6 +76,15 @@ export default function ExaminerPage() {
     setSupported(Boolean(SpeechRecognitionCtor));
   }, [SpeechRecognitionCtor]);
 
+  function recordProgress(scored: { accuracy: number; missing: string[] }) {
+    const p = loadProgress();
+    p.examiner.attempts += 1;
+    p.examiner.bestAccuracy = Math.max(p.examiner.bestAccuracy, scored.accuracy / 100);
+    p.examiner.lastRunAt = new Date().toISOString();
+    bumpStreak(p);
+    saveProgress(p);
+  }
+
   function startMic() {
     setError(null);
     setResult(null);
@@ -110,20 +109,14 @@ export default function ExaminerPage() {
       const text = Array.from(event.results)
         .map((r: any) => r[0]?.transcript ?? "")
         .join(" ");
+
       setTranscript(text);
 
       const last = event.results[event.results.length - 1];
       if (last && last.isFinal) {
-
-const scored = scorePhrase(current.text, text);
-setResult(scored);
-
-const p = loadProgress();
-p.examiner.attempts += 1;
-p.examiner.bestAccuracy = Math.max(p.examiner.bestAccuracy, scored.accuracy);
-bumpStreak(p);
-saveProgress(p);       
-
+        const scored = scorePhrase(current.text, text);
+        setResult(scored);
+        recordProgress(scored);
       }
     };
 
@@ -135,7 +128,14 @@ saveProgress(p);
     recog.onend = () => {
       setListening(false);
       // If we never got final, score whatever we captured
-      setResult((prev) => prev ?? (transcript ? scorePhrase(current.text, transcript) : null));
+      setResult((prev) => {
+        if (prev) return prev;
+        if (!transcript) return null;
+        const scored = scorePhrase(current.text, transcript);
+        // optional: only record if we got something
+        recordProgress(scored);
+        return scored;
+      });
     };
 
     try {
@@ -161,7 +161,20 @@ saveProgress(p);
   }
 
   return (
-    <main>
+    <main className="mx-auto max-w-4xl px-4 py-10">
+      <div className="mb-6 flex justify-center">
+        <div className="w-48 overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <Image
+            src={IMAGES.accent}
+            alt="Examiner"
+            width={512}
+            height={512}
+            className="h-auto w-full"
+            priority
+          />
+        </div>
+      </div>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold text-blue-700">Examiner Talk + Speaking Practice</h1>
         <div className="text-sm text-gray-500">
@@ -201,17 +214,11 @@ saveProgress(p);
             {listening ? "🎙 Listening..." : "🎙 Start Mic"}
           </button>
 
-          <button
-            onClick={back}
-            className="px-4 py-2 rounded-xl bg-white border hover:bg-gray-50"
-          >
+          <button onClick={back} className="px-4 py-2 rounded-xl bg-white border hover:bg-gray-50">
             ← Back
           </button>
 
-          <button
-            onClick={next}
-            className="px-4 py-2 rounded-xl bg-white border hover:bg-gray-50"
-          >
+          <button onClick={next} className="px-4 py-2 rounded-xl bg-white border hover:bg-gray-50">
             Next →
           </button>
         </div>
@@ -219,36 +226,35 @@ saveProgress(p);
         {error && (
           <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
             {error}
-            <div className="mt-2 text-sm text-red-600">
-              If you see “not-allowed”, click the 🔒 icon in your browser and allow Microphone.
+          </div>
+        )}
+
+        {transcript && (
+          <div className="mt-6">
+            <div className="text-sm text-gray-500">You said</div>
+            <div className="mt-1 rounded-xl border bg-gray-50 p-3">{transcript}</div>
+          </div>
+        )}
+
+        {result && (
+          <div className="mt-6 grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border p-4">
+              <div className="text-sm text-gray-500">Accuracy</div>
+              <div className="mt-1 text-3xl font-bold text-blue-700">{result.accuracy}%</div>
+            </div>
+
+            <div className="rounded-2xl border p-4">
+              <div className="text-sm text-gray-500">Missing words</div>
+              <div className="mt-2 text-gray-700">
+                {result.missing.length === 0 ? (
+                  <span className="text-green-700 font-semibold">None ✅</span>
+                ) : (
+                  result.missing.join(", ")
+                )}
+              </div>
             </div>
           </div>
         )}
-
-        <div className="mt-6">
-          <div className="text-sm text-gray-500">What the app heard</div>
-          <div className="mt-2 p-3 rounded-xl bg-gray-50 border min-h-[48px]">
-            {transcript || <span className="text-gray-400">—</span>}
-          </div>
-        </div>
-
-        {result && (
-          <div className="mt-6 p-4 rounded-xl border bg-green-50 border-green-200">
-            <div className="font-semibold">Accuracy: {result.accuracy}%</div>
-            {result.missing.length > 0 ? (
-              <div className="mt-2 text-sm text-gray-700">
-                Missing words: <span className="font-medium">{result.missing.join(", ")}</span>
-              </div>
-            ) : (
-              <div className="mt-2 text-sm text-gray-700">Nice! You hit all key words.</div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="mt-8 text-sm text-gray-500">
-        Tip: Speech recognition usually requires HTTPS (you have it) + a user click before starting
-        the mic.
       </div>
     </main>
   );
