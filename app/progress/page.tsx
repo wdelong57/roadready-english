@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { loadProgress, ProgressData } from "@/lib/progress";
+import { loadProgress, type Progress } from "@/lib/progress";
 
 export default function ProgressPage() {
-  const [p, setP] = useState<ProgressData | null>(null);
+  const [p, setP] = useState<Progress | null>(null);
 
   useEffect(() => {
     setP(loadProgress());
