@@ -1,67 +1,78 @@
-"use client";
+export type ProgressData = {
+  lessonCompleted: Record<string, string>; // ISO timestamp per lesson
+  streak: number;
+  lastCompletedDate: string | null; // YYYY-MM-DD
+};
 
-import { useEffect, useState } from "react";
-import { loadProgress, ProgressData } from "@/lib/progress";
+const STORAGE_KEY = "roadready_progress_v1";
 
-export default function ProgressPage() {
-  const [p, setP] = useState<ProgressData | null>(null);
+function todayKey(d = new Date()): string {
+  // local date key YYYY-MM-DD
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
 
-  useEffect(() => {
-    setP(loadProgress());
-  }, []);
+export function loadProgress(): ProgressData {
+  if (typeof window === "undefined") {
+    // Server-side safe default
+    return { lessonCompleted: {}, streak: 0, lastCompletedDate: null };
+  }
 
-  if (!p) return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return { lessonCompleted: {}, streak: 0, lastCompletedDate: null };
 
-  const lessonsDone = Object.keys(p.lessonCompleted).length;
+    const parsed = JSON.parse(raw) as Partial<ProgressData>;
+    return {
+      lessonCompleted: parsed.lessonCompleted ?? {},
+      streak: typeof parsed.streak === "number" ? parsed.streak : 0,
+      lastCompletedDate: parsed.lastCompletedDate ?? null,
+    };
+  } catch {
+    return { lessonCompleted: {}, streak: 0, lastCompletedDate: null };
+  }
+}
 
-  return (
-    <main>
-      <h1 className="text-3xl font-bold text-blue-700">Your Progress</h1>
+export function saveProgress(p: ProgressData) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+}
 
-      <section className="mt-8 grid md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-2xl shadow p-6">
-          <div className="text-sm text-gray-500">Streak</div>
-          <div className="mt-2 text-3xl font-bold">{p.streak.count} 🔥</div>
-          <div className="mt-1 text-sm text-gray-600">
-            Last activity: {p.streak.lastDate ?? "—"}
-          </div>
-        </div>
+/**
+ * Update streak based on "today". Call this when a lesson is completed.
+ * Rules:
+ * - If lastCompletedDate is today -> streak unchanged
+ * - If lastCompletedDate is yesterday -> streak + 1
+ * - Else -> streak = 1
+ */
+export function bumpStreak(p: ProgressData) {
+  const today = todayKey(new Date());
 
-        <div className="bg-white rounded-2xl shadow p-6">
-          <div className="text-sm text-gray-500">Lessons completed</div>
-          <div className="mt-2 text-3xl font-bold">{lessonsDone}</div>
-          <div className="mt-1 text-sm text-gray-600">
-            {lessonsDone ? Object.keys(p.lessonCompleted).join(", ") : "Start Day 1 to begin"}
-          </div>
-        </div>
+  if (!p.lastCompletedDate) {
+    p.streak = 1;
+    p.lastCompletedDate = today;
+    return;
+  }
 
-        <div className="bg-white rounded-2xl shadow p-6">
-          <div className="text-sm text-gray-500">Signs quiz best</div>
-          <div className="mt-2 text-3xl font-bold">
-            {p.signs.bestScore}/{p.signs.bestTotal}
-          </div>
-          <div className="mt-1 text-sm text-gray-600">Best session score</div>
-        </div>
-      </section>
+  if (p.lastCompletedDate === today) return;
 
-      <section className="mt-6 grid md:grid-cols-2 gap-6">
-        <div className="bg-white rounded-2xl shadow p-6">
-          <div className="text-sm text-gray-500">Examiner speaking</div>
-          <div className="mt-2 text-2xl font-bold">{p.examiner.bestAccuracy}%</div>
-          <div className="mt-1 text-sm text-gray-600">
-            Attempts: {p.examiner.attempts}
-          </div>
-        </div>
+  // compute yesterday key
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  const yesterday = todayKey(d);
 
-        <div className="bg-white rounded-2xl shadow p-6">
-          <div className="text-sm text-gray-500">Next suggested</div>
-          <ul className="mt-3 list-disc pl-5 text-gray-700">
-            <li>Complete Day 1 lesson</li>
-            <li>Try the Signs quiz</li>
-            <li>Practice 3 Examiner phrases</li>
-          </ul>
-        </div>
-      </section>
-    </main>
-  );
+  if (p.lastCompletedDate === yesterday) {
+    p.streak = (p.streak ?? 0) + 1;
+  } else {
+    p.streak = 1;
+  }
+
+  p.lastCompletedDate = today;
+}
+
+export function resetProgress() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(STORAGE_KEY);
 }
