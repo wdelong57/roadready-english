@@ -1,0 +1,138 @@
+[1mdiff --git a/lib/progress.ts b/lib/progress.ts[m
+[1mindex 5c8b1e7..f3afe63 100644[m
+[1m--- a/lib/progress.ts[m
+[1m+++ b/lib/progress.ts[m
+[36m@@ -1,67 +1,78 @@[m
+[31m-"use client";[m
+[32m+[m[32mexport type ProgressData = {[m
+[32m+[m[32m  lessonCompleted: Record<string, string>; // ISO timestamp per lesson[m
+[32m+[m[32m  streak: number;[m
+[32m+[m[32m  lastCompletedDate: string | null; // YYYY-MM-DD[m
+[32m+[m[32m};[m
+ [m
+[31m-import { useEffect, useState } from "react";[m
+[31m-import { loadProgress, ProgressData } from "@/lib/progress";[m
+[32m+[m[32mconst STORAGE_KEY = "roadready_progress_v1";[m
+ [m
+[31m-export default function ProgressPage() {[m
+[31m-  const [p, setP] = useState<ProgressData | null>(null);[m
+[32m+[m[32mfunction todayKey(d = new Date()): string {[m
+[32m+[m[32m  // local date key YYYY-MM-DD[m
+[32m+[m[32m  const yyyy = d.getFullYear();[m
+[32m+[m[32m  const mm = String(d.getMonth() + 1).padStart(2, "0");[m
+[32m+[m[32m  const dd = String(d.getDate()).padStart(2, "0");[m
+[32m+[m[32m  return `${yyyy}-${mm}-${dd}`;[m
+[32m+[m[32m}[m
+[32m+[m
+[32m+[m[32mexport function loadProgress(): ProgressData {[m
+[32m+[m[32m  if (typeof window === "undefined") {[m
+[32m+[m[32m    // Server-side safe default[m
+[32m+[m[32m    return { lessonCompleted: {}, streak: 0, lastCompletedDate: null };[m
+[32m+[m[32m  }[m
+[32m+[m
+[32m+[m[32m  try {[m
+[32m+[m[32m    const raw = localStorage.getItem(STORAGE_KEY);[m
+[32m+[m[32m    if (!raw) return { lessonCompleted: {}, streak: 0, lastCompletedDate: null };[m
+ [m
+[31m-  useEffect(() => {[m
+[31m-    setP(loadProgress());[m
+[31m-  }, []);[m
+[32m+[m[32m    const parsed = JSON.parse(raw) as Partial<ProgressData>;[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      lessonCompleted: parsed.lessonCompleted ?? {},[m
+[32m+[m[32m      streak: typeof parsed.streak === "number" ? parsed.streak : 0,[m
+[32m+[m[32m      lastCompletedDate: parsed.lastCompletedDate ?? null,[m
+[32m+[m[32m    };[m
+[32m+[m[32m  } catch {[m
+[32m+[m[32m    return { lessonCompleted: {}, streak: 0, lastCompletedDate: null };[m
+[32m+[m[32m  }[m
+[32m+[m[32m}[m
+ [m
+[31m-  if (!p) return null;[m
+[32m+[m[32mexport function saveProgress(p: ProgressData) {[m
+[32m+[m[32m  if (typeof window === "undefined") return;[m
+[32m+[m[32m  localStorage.setItem(STORAGE_KEY, JSON.stringify(p));[m
+[32m+[m[32m}[m
+ [m
+[31m-  const lessonsDone = Object.keys(p.lessonCompleted).length;[m
+[32m+[m[32m/**[m
+[32m+[m[32m * Update streak based on "today". Call this when a lesson is completed.[m
+[32m+[m[32m * Rules:[m
+[32m+[m[32m * - If lastCompletedDate is today -> streak unchanged[m
+[32m+[m[32m * - If lastCompletedDate is yesterday -> streak + 1[m
+[32m+[m[32m * - Else -> streak = 1[m
+[32m+[m[32m */[m
+[32m+[m[32mexport function bumpStreak(p: ProgressData) {[m
+[32m+[m[32m  const today = todayKey(new Date());[m
+ [m
+[31m-  return ([m
+[31m-    <main>[m
+[31m-      <h1 className="text-3xl font-bold text-blue-700">Your Progress</h1>[m
+[32m+[m[32m  if (!p.lastCompletedDate) {[m
+[32m+[m[32m    p.streak = 1;[m
+[32m+[m[32m    p.lastCompletedDate = today;[m
+[32m+[m[32m    return;[m
+[32m+[m[32m  }[m
+ [m
+[31m-      <section className="mt-8 grid md:grid-cols-3 gap-6">[m
+[31m-        <div className="bg-white rounded-2xl shadow p-6">[m
+[31m-          <div className="text-sm text-gray-500">Streak</div>[m
+[31m-          <div className="mt-2 text-3xl font-bold">{p.streak.count} 🔥</div>[m
+[31m-          <div className="mt-1 text-sm text-gray-600">[m
+[31m-            Last activity: {p.streak.lastDate ?? "—"}[m
+[31m-          </div>[m
+[31m-        </div>[m
+[32m+[m[32m  if (p.lastCompletedDate === today) return;[m
+ [m
+[31m-        <div className="bg-white rounded-2xl shadow p-6">[m
+[31m-          <div className="text-sm text-gray-500">Lessons completed</div>[m
+[31m-          <div className="mt-2 text-3xl font-bold">{lessonsDone}</div>[m
+[31m-          <div className="mt-1 text-sm text-gray-600">[m
+[31m-            {lessonsDone ? Object.keys(p.lessonCompleted).join(", ") : "Start Day 1 to begin"}[m
+[31m-          </div>[m
+[31m-        </div>[m
+[32m+[m[32m  // compute yesterday key[m
+[32m+[m[32m  const d = new Date();[m
+[32m+[m[32m  d.setDate(d.getDate() - 1);[m
+[32m+[m[32m  const yesterday = todayKey(d);[m
+ [m
+[31m-        <div className="bg-white rounded-2xl shadow p-6">[m
+[31m-          <div className="text-sm text-gray-500">Signs quiz best</div>[m
+[31m-          <div className="mt-2 text-3xl font-bold">[m
+[31m-            {p.signs.bestScore}/{p.signs.bestTotal}[m
+[31m-          </div>[m
+[31m-          <div className="mt-1 text-sm text-gray-600">Best session score</div>[m
+[31m-        </div>[m
+[31m-      </section>[m
+[32m+[m[32m  if (p.lastCompletedDate === yesterday) {[m
+[32m+[m[32m    p.streak = (p.streak ?? 0) + 1;[m
+[32m+[m[32m  } else {[m
+[32m+[m[32m    p.streak = 1;[m
+[32m+[m[32m  }[m
+ [m
+[31m-      <section className="mt-6 grid md:grid-cols-2 gap-6">[m
+[31m-        <div className="bg-white rounded-2xl shadow p-6">[m
+[31m-          <div className="text-sm text-gray-500">Examiner speaking</div>[m
+[31m-          <div className="mt-2 text-2xl font-bold">{p.examiner.bestAccuracy}%</div>[m
+[31m-          <div className="mt-1 text-sm text-gray-600">[m
+[31m-            Attempts: {p.examiner.attempts}[m
+[31m-          </div>[m
+[31m-        </div>[m
+[32m+[m[32m  p.lastCompletedDate = today;[m
+[32m+[m[32m}[m
+ [m
+[31m-        <div className="bg-white rounded-2xl shadow p-6">[m
+[31m-          <div className="text-sm text-gray-500">Next suggested</div>[m
+[31m-          <ul className="mt-3 list-disc pl-5 text-gray-700">[m
+[31m-            <li>Complete Day 1 lesson</li>[m
+[31m-            <li>Try the Signs quiz</li>[m
+[31m-            <li>Practice 3 Examiner phrases</li>[m
+[31m-          </ul>[m
+[31m-        </div>[m
+[31m-      </section>[m
+[31m-    </main>[m
+[31m-  );[m
+[32m+[m[32mexport function resetProgress() {[m
+[32m+[m[32m  if (typeof window === "undefined") return;[m
+[32m+[m[32m  localStorage.removeItem(STORAGE_KEY);[m
+ }[m
