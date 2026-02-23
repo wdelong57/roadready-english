@@ -1,6 +1,18 @@
 "use client";
 
 import { bumpStreak, loadProgress, saveProgress } from "@/lib/progress";
+
+<div className="mb-6 flex justify-center">
+  <div className="w-48 overflow-hidden rounded-2xl border">
+    <Image
+      src={IMAGES.accent}
+      alt="Examiner"
+      width={512}
+      height={512}
+      className="w-full h-auto"
+    />
+  </div>
+</div>
 import { useEffect, useMemo, useState } from "react";
 
 type Phrase = { text: string; tip?: string };

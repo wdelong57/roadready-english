@@ -1,6 +1,19 @@
 "use client";
 
 import { useMemo, useState } from "react";
+
+import Image from "next/image";
+import { IMAGES } from "@/lib/images";
+
+<div className="mb-6 overflow-hidden rounded-2xl border">
+  <Image
+    src={IMAGES.hero}
+    alt="Lesson"
+    width={1200}
+    height={600}
+    className="w-full h-auto"
+  />
+</div>
 import { bumpStreak, loadProgress, saveProgress } from "@/lib/progress";
 
 type Item = { word: string; meaning: string; example: string };

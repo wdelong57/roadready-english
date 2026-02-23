@@ -1,6 +1,18 @@
 "use client";
+import Image from "next/image";
+import { IMAGES } from "@/lib/images";
 
 import { useEffect, useState } from "react";
+
+<div className="mb-8 overflow-hidden rounded-3xl border">
+  <Image
+    src={IMAGES.accent}
+    alt="Progress"
+    width={1200}
+    height={500}
+    className="w-full h-auto"
+  />
+</div>
 import { loadProgress, type Progress } from "@/lib/progress";
 
 export default function ProgressPage() {
