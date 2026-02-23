@@ -1,184 +1,175 @@
 // lib/progress.ts
-// Client-side progress tracking (localStorage). No JSX here.
-
-export type LessonId = string;
-
-export type LessonCompletedMap = Record<LessonId, string>; // ISO timestamp
-
-export type ExaminerProgress = {
-  attempts: number;
-  bestAccuracy: number; // 0..1
-  lastAttemptAt?: string; // ISO
-};
+// Pure TypeScript utilities (NO JSX). Safe in Next.js App Router.
 
 export type Progress = {
   version: number;
 
-  // streak + engagement
-  streak: number;
-  lastActiveDate: string | null; // YYYY-MM-DD
+  createdAt: string;        // ISO
+  updatedAt: string;        // ISO
+  lastActiveAt: string;     // ISO
 
-  // lessons
-  lessonCompleted: LessonCompletedMap;
+  streak: {
+    count: number;
+    lastDate: string;       // YYYY-MM-DD (local)
+  };
 
-  // features / modules
-  examiner: ExaminerProgress;
+  // Mark lessons completed by slug: "day-1", "day-2", ...
+  lessonCompleted: Record<string, string>; // ISO timestamp
+
+  // Examiner quiz stats
+  examiner: {
+    attempts: number;
+    bestAccuracy: number;   // 0..1
+    lastRunAt: string | null;
+  };
 };
 
 const STORAGE_KEY = "roadready_progress_v1";
-const VERSION = 1;
 
-function todayYMD(d = new Date()): string {
-  // Use local time; if you want strict UTC, adjust accordingly.
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+function isoNow() {
+  return new Date().toISOString();
 }
 
-export function getDefaultProgress(): Progress {
+function localDayString(d = new Date()) {
+  // YYYY-MM-DD in local time
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function defaultProgress(): Progress {
+  const now = isoNow();
   return {
-    version: VERSION,
-    streak: 0,
-    lastActiveDate: null,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    lastActiveAt: now,
+
+    streak: {
+      count: 0,
+      lastDate: "",
+    },
 
     lessonCompleted: {},
 
     examiner: {
       attempts: 0,
       bestAccuracy: 0,
-      lastAttemptAt: undefined,
+      lastRunAt: null,
     },
   };
 }
 
-function safeParse(json: string | null): any | null {
-  if (!json) return null;
+function isBrowser() {
+  return typeof window !== "undefined" && typeof localStorage !== "undefined";
+}
+
+function safeParse(raw: string | null): unknown {
+  if (!raw) return null;
   try {
-    return JSON.parse(json);
+    return JSON.parse(raw);
   } catch {
     return null;
   }
 }
 
 /**
- * Ensures any older/partial progress object gets all required fields.
- * This prevents "Property X does not exist" and runtime undefined errors.
+ * Merge saved progress with defaults so missing fields never break builds/pages.
  */
-export function normalizeProgress(input: any): Progress {
-  const d = getDefaultProgress();
+export function normalizeProgress(input: unknown): Progress {
+  const base = defaultProgress();
 
-  // If input is not an object, return defaults
-  if (!input || typeof input !== "object") return d;
+  if (!input || typeof input !== "object") return base;
 
-  const p: Progress = {
-    version: typeof input.version === "number" ? input.version : VERSION,
+  const obj = input as Record<string, any>;
 
-    streak: typeof input.streak === "number" ? input.streak : d.streak,
-    lastActiveDate:
-      typeof input.lastActiveDate === "string" || input.lastActiveDate === null
-        ? input.lastActiveDate
-        : d.lastActiveDate,
+  const merged: Progress = {
+    ...base,
+    version: typeof obj.version === "number" ? obj.version : base.version,
+    createdAt: typeof obj.createdAt === "string" ? obj.createdAt : base.createdAt,
+    updatedAt: typeof obj.updatedAt === "string" ? obj.updatedAt : base.updatedAt,
+    lastActiveAt: typeof obj.lastActiveAt === "string" ? obj.lastActiveAt : base.lastActiveAt,
+
+    streak: {
+      count:
+        obj.streak && typeof obj.streak.count === "number"
+          ? obj.streak.count
+          : base.streak.count,
+      lastDate:
+        obj.streak && typeof obj.streak.lastDate === "string"
+          ? obj.streak.lastDate
+          : base.streak.lastDate,
+    },
 
     lessonCompleted:
-      input.lessonCompleted && typeof input.lessonCompleted === "object"
-        ? (input.lessonCompleted as LessonCompletedMap)
-        : d.lessonCompleted,
+      obj.lessonCompleted && typeof obj.lessonCompleted === "object"
+        ? { ...base.lessonCompleted, ...obj.lessonCompleted }
+        : base.lessonCompleted,
 
     examiner: {
       attempts:
-        input.examiner && typeof input.examiner.attempts === "number"
-          ? input.examiner.attempts
-          : d.examiner.attempts,
-
+        obj.examiner && typeof obj.examiner.attempts === "number"
+          ? obj.examiner.attempts
+          : base.examiner.attempts,
       bestAccuracy:
-        input.examiner && typeof input.examiner.bestAccuracy === "number"
-          ? input.examiner.bestAccuracy
-          : d.examiner.bestAccuracy,
-
-      lastAttemptAt:
-        input.examiner && typeof input.examiner.lastAttemptAt === "string"
-          ? input.examiner.lastAttemptAt
-          : d.examiner.lastAttemptAt,
+        obj.examiner && typeof obj.examiner.bestAccuracy === "number"
+          ? obj.examiner.bestAccuracy
+          : base.examiner.bestAccuracy,
+      lastRunAt:
+        obj.examiner && (typeof obj.examiner.lastRunAt === "string" || obj.examiner.lastRunAt === null)
+          ? obj.examiner.lastRunAt
+          : base.examiner.lastRunAt,
     },
   };
 
-  return p;
+  return merged;
 }
 
 export function loadProgress(): Progress {
-  if (typeof window === "undefined") return getDefaultProgress();
+  // Must not crash during SSR/build
+  if (!isBrowser()) return defaultProgress();
 
-  const raw = safeParse(window.localStorage.getItem(STORAGE_KEY));
-  return normalizeProgress(raw);
-}
+  const raw = localStorage.getItem(STORAGE_KEY);
+  const parsed = safeParse(raw);
+  const p = normalizeProgress(parsed);
 
-export function saveProgress(progress: Progress): void {
-  if (typeof window === "undefined") return;
-
-  const normalized = normalizeProgress(progress);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
-}
-
-/**
- * Call this when the user completes an action for the day.
- * - If lastActiveDate was yesterday -> streak++
- * - If lastActiveDate was today -> no change
- * - Otherwise -> streak = 1
- */
-export function bumpStreak(progress: Progress): Progress {
-  const p = normalizeProgress(progress);
-
-  const today = todayYMD();
-  const last = p.lastActiveDate;
-
-  if (last === today) {
-    return p; // already counted today
-  }
-
-  // Compute yesterday in local time
-  const now = new Date();
-  const yesterdayDate = new Date(now);
-  yesterdayDate.setDate(now.getDate() - 1);
-  const yesterday = todayYMD(yesterdayDate);
-
-  if (last === yesterday) {
-    p.streak = Math.max(1, p.streak + 1);
-  } else {
-    p.streak = 1;
-  }
-
-  p.lastActiveDate = today;
+  // keep lastActive fresh but don't save automatically (caller can save if desired)
+  p.lastActiveAt = isoNow();
   return p;
 }
 
-export function markLessonComplete(progress: Progress, lessonId: LessonId): Progress {
-  const p = normalizeProgress(progress);
-  p.lessonCompleted[lessonId] = new Date().toISOString();
+export function saveProgress(p: Progress) {
+  if (!isBrowser()) return;
+
+  const now = isoNow();
+  const next: Progress = {
+    ...normalizeProgress(p),
+    updatedAt: now,
+    lastActiveAt: now,
+  };
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+}
+
+export function bumpStreak(p: Progress): Progress {
+  const today = localDayString();
+  const last = p.streak?.lastDate || "";
+
+  // same day: no change
+  if (last === today) return p;
+
+  // yesterday check (local)
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yStr = localDayString(yesterday);
+
+  const nextCount = last === yStr ? (p.streak?.count || 0) + 1 : 1;
+
+  p.streak = {
+    count: nextCount,
+    lastDate: today,
+  };
+
   return p;
-}
-
-export function isLessonComplete(progress: Progress, lessonId: LessonId): boolean {
-  const p = normalizeProgress(progress);
-  return Boolean(p.lessonCompleted?.[lessonId]);
-}
-
-export function bumpExaminerAttempt(progress: Progress, accuracy: number): Progress {
-  const p = normalizeProgress(progress);
-
-  p.examiner.attempts += 1;
-  p.examiner.lastAttemptAt = new Date().toISOString();
-
-  const safeAcc = Number.isFinite(accuracy) ? Math.max(0, Math.min(1, accuracy)) : 0;
-  p.examiner.bestAccuracy = Math.max(p.examiner.bestAccuracy, safeAcc);
-
-  return p;
-}
-
-/**
- * Optional: wipe progress (debug/reset)
- */
-export function clearProgress(): void {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(STORAGE_KEY);
 }
