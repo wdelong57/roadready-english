@@ -4,25 +4,37 @@
 export type Progress = {
   version: number;
 
-  createdAt: string;        // ISO
-  updatedAt: string;        // ISO
-  lastActiveAt: string;     // ISO
+  createdAt: string; // ISO
+  updatedAt: string; // ISO
+  lastActiveAt: string; // ISO
 
   streak: {
     count: number;
-    lastDate: string;       // YYYY-MM-DD (local)
+    lastDate: string; // YYYY-MM-DD (local)
   };
 
   // Mark lessons completed by slug: "day-1", "day-2", ...
   lessonCompleted: Record<string, string>; // ISO timestamp
 
+  // Signs quiz stats
+  signs: {
+    attempts: number;
+    bestScore: number;
+    bestTotal: number;
+    lastRunAt: string | null;
+  };
+
   // Examiner quiz stats
   examiner: {
     attempts: number;
-    bestAccuracy: number;   // 0..1
+    bestAccuracy: number; // 0..1
     lastRunAt: string | null;
   };
 };
+
+// Backwards-compat for older imports:
+// import { loadProgress, ProgressData } from "@/lib/progress";
+export type ProgressData = Progress;
 
 const STORAGE_KEY = "roadready_progress_v1";
 
@@ -52,6 +64,13 @@ export function defaultProgress(): Progress {
     },
 
     lessonCompleted: {},
+
+    signs: {
+      attempts: 0,
+      bestScore: 0,
+      bestTotal: 0,
+      lastRunAt: null,
+    },
 
     examiner: {
       attempts: 0,
@@ -106,6 +125,25 @@ export function normalizeProgress(input: unknown): Progress {
       obj.lessonCompleted && typeof obj.lessonCompleted === "object"
         ? { ...base.lessonCompleted, ...obj.lessonCompleted }
         : base.lessonCompleted,
+
+    signs: {
+      attempts:
+        obj.signs && typeof obj.signs.attempts === "number"
+          ? obj.signs.attempts
+          : base.signs.attempts,
+      bestScore:
+        obj.signs && typeof obj.signs.bestScore === "number"
+          ? obj.signs.bestScore
+          : base.signs.bestScore,
+      bestTotal:
+        obj.signs && typeof obj.signs.bestTotal === "number"
+          ? obj.signs.bestTotal
+          : base.signs.bestTotal,
+      lastRunAt:
+        obj.signs && (typeof obj.signs.lastRunAt === "string" || obj.signs.lastRunAt === null)
+          ? obj.signs.lastRunAt
+          : base.signs.lastRunAt,
+    },
 
     examiner: {
       attempts:
